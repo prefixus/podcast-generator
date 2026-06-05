@@ -1,0 +1,68 @@
+[project]
+name = "podcast-generator"
+version = "0.1.0"
+description = "Generate podcast audio files from PDF books using OpenAI API"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.30.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+    "pytest>=8.3.0",
+    "poethepoet>=0.29.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+filterwarnings = ["ignore::pytest.PytestConfigWarning"]
+
+[tool.poe.tasks.dev]
+help = "Run all development tasks (format + test + lint)"
+sequence = [
+    { cmd = "ruff check ." },
+    { cmd = "ruff format ." },
+    "dev-test",
+    "dev-lint",
+]
+
+[tool.poe.tasks.dev-format]
+help = "Run ruff linter and formatter"
+sequence = [
+    { cmd = "ruff check ." },
+    { cmd = "ruff format ." },
+]
+
+[tool.poe.tasks.dev-test]
+help = "Run pytest"
+cmd = "pytest"
+
+[tool.poe.tasks.dev-lint]
+help = "Run mypy type checks"
+cmd = "mypy ."

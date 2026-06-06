@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# env vars
+.env
+
+# data 
+example-data/*
+output/*
+tests/output/*

@@ -1,10 +1,11 @@
 [project]
 name = "podcast-generator"
 version = "0.1.0"
-description = "Generate podcast audio files from PDF books using OpenAI API"
+description = "PDF-to-podcast preprocessor: extract structured content and produce TTS-ready scripts for popular providers (ElevenLabs, Amazon Polly, Azure TTS, Google Cloud TTS)"
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.30.0",
+    "pypdf>=6.0.0",
 ]
 
 [dependency-groups]

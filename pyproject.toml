@@ -7,6 +7,7 @@ dependencies = [
     "openai>=1.30.0",
     "pypdf>=6.0.0",
     "requests>=2.31.0",
+    "google-cloud-texttospeech>=2.16.0",
 ]
 
 [dependency-groups]
@@ -72,3 +73,7 @@ cmd = "mypy ."
 [tool.poe.tasks.generate-test-samples]
 help = "Generate test audio samples from local TTS server"
 cmd = "python -m scripts.generate_test_samples"
+
+[tool.poe.tasks.generate-google-test-samples]
+help = "Generate test audio samples via Google TTS"
+cmd = "python -m scripts.generate_google_test_samples"

@@ -5,6 +5,7 @@ scripts, and generates audio files via supported TTS backends:
 
   - OpenAI Speech API (default)
   - Local FastAPI server (e.g. Higgs Audio v3)
+  - Google Cloud Text-to-Speech
 
 Usage:
     # Preprocess only (script generation):
@@ -15,6 +16,9 @@ Usage:
 
     # Full pipeline with local TTS server:
     python main.py --tts --local-tts --tts-host 127.0.0.1 --tts-port 8000
+
+    # Full pipeline with Google Cloud TTS:
+    python main.py --tts --google-tts --google-voice pl-PL-Wavenet-A
 
     # Custom PDF with TTS:
     python main.py path/to/file.pdf --tts --voice nova --model tts-1-hd
@@ -33,9 +37,11 @@ from preprocess.tts_script_builder import (
     save_script_text,
 )
 from tts import (
+    GoogleTTSConfig,
     LocalTTSConfig,
     OpenAITTSConfig,
     generate_podcast_audio,
+    generate_podcast_audio_google,
     generate_podcast_audio_local,
 )
 
@@ -45,13 +51,15 @@ def process_pdf(
     output_dir: str | Path = "output",
     generate_audio: bool = False,
     use_local_tts: bool = False,
+    use_google_tts: bool = False,
     tts_config: OpenAITTSConfig | None = None,
     local_tts_config: LocalTTSConfig | None = None,
+    google_tts_config: GoogleTTSConfig | None = None,
 ) -> PodcastScript:
     """Full pipeline: PDF → structured sections → TTS-ready script.
 
-    Optionally generates audio files via OpenAI Speech API or a local
-    FastAPI TTS server when ``generate_audio=True``.
+    Optionally generates audio files via OpenAI Speech API, a local
+    FastAPI TTS server, or Google Cloud TTS when ``generate_audio=True``.
     """
     pdf_path = Path(pdf_path)
     output_dir = Path(output_dir)
@@ -75,6 +83,11 @@ def process_pdf(
                 local_tts_config = LocalTTSConfig(output_dir=output_dir / "audio")
             audio_map = generate_podcast_audio_local(script, local_tts_config)
             print(f"Generated {len(audio_map)} audio files via local TTS")
+        elif use_google_tts:
+            if google_tts_config is None:
+                google_tts_config = GoogleTTSConfig(output_dir=output_dir / "audio")
+            audio_map = generate_podcast_audio_google(script, google_tts_config)
+            print(f"Generated {len(audio_map)} audio files via Google Cloud TTS")
         else:
             if tts_config is None:
                 tts_config = OpenAITTSConfig(output_dir=output_dir / "audio")
@@ -98,6 +111,7 @@ def main() -> None:
     # Simple argument parsing
     generate_audio = "--tts" in args or "--audio" in args
     use_local_tts = "--local-tts" in args
+    use_google_tts = "--google-tts" in args
     tts_voice = "alloy"
     tts_model = "tts-1"
     output_dir = "output"
@@ -105,6 +119,9 @@ def main() -> None:
     tts_host = "127.0.0.1"
     tts_port = 8000
     tts_language = "pl"
+    google_voice = "pl-PL-Wavenet-A"
+    google_language = "pl-PL"
+    google_credentials = None
 
     i = 0
     while i < len(args):
@@ -113,6 +130,8 @@ def main() -> None:
             pass  # handled above
         elif arg == "--local-tts":
             use_local_tts = True
+        elif arg == "--google-tts":
+            use_google_tts = True
         elif arg == "--voice" and i + 1 < len(args):
             tts_voice = args[i + 1]
             i += 1
@@ -134,6 +153,15 @@ def main() -> None:
         elif arg == "--tts-language" and i + 1 < len(args):
             tts_language = args[i + 1]
             i += 1
+        elif arg == "--google-voice" and i + 1 < len(args):
+            google_voice = args[i + 1]
+            i += 1
+        elif arg == "--google-language" and i + 1 < len(args):
+            google_language = args[i + 1]
+            i += 1
+        elif arg == "--google-credentials" and i + 1 < len(args):
+            google_credentials = args[i + 1]
+            i += 1
         elif not arg.startswith("-"):
             pdf_file = arg
         i += 1
@@ -151,6 +179,20 @@ def main() -> None:
             generate_audio=generate_audio,
             use_local_tts=True,
             local_tts_config=local_tts_config,
+        )
+    elif use_google_tts:
+        google_tts_config = GoogleTTSConfig(
+            voice_name=google_voice,
+            language_code=google_language,
+            credentials_file=google_credentials,
+            output_dir=Path(output_dir) / "audio",
+        )
+        process_pdf(
+            pdf_file,
+            output_dir,
+            generate_audio=generate_audio,
+            use_google_tts=True,
+            google_tts_config=google_tts_config,
         )
     else:
         tts_config = OpenAITTSConfig(

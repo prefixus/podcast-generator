@@ -6,8 +6,21 @@ preprocess pipeline (pdf_extractor → tts_script_builder).
 Supported backends:
   - OpenAI Speech API (default)
   - Local FastAPI server (e.g. Higgs Audio v3)
+  - Google Cloud Text-to-Speech
 """
 
+from tts.google_tts import (
+    GoogleTTSConfig,
+)
+from tts.google_tts import (
+    generate_podcast_audio as generate_podcast_audio_google,
+)
+from tts.google_tts import (
+    load_manifest as load_manifest_google,
+)
+from tts.google_tts import (
+    save_audio_file as save_audio_file_google,
+)
 from tts.local_tts import (
     LocalTTSConfig,
     generate_test_samples,
@@ -42,4 +55,9 @@ __all__ = [
     "generate_test_samples",
     "load_manifest_local",
     "save_audio_file_local",
+    # Google Cloud TTS backend
+    "GoogleTTSConfig",
+    "generate_podcast_audio_google",
+    "load_manifest_google",
+    "save_audio_file_google",
 ]

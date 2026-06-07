@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 import subprocess
 import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 
@@ -84,10 +85,7 @@ def _should_skip_test(module_path: str) -> bool:
 def pytest_collection_modifyitems(session: pytest.Session, config: pytest.Config, items: list[pytest.Item]) -> None:
     """Skip slow tests if their source files are unchanged."""
     skip_marker = pytest.mark.skip(
-        reason=(
-            "Skipping slow test (source files unchanged). "
-            "Run with --run-slow to force execution."
-        ),
+        reason=("Skipping slow test (source files unchanged). Run with --run-slow to force execution."),
     )
     for item in items:
         module_file = getattr(item, "module", None)

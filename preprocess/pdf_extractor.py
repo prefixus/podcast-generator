@@ -156,9 +156,7 @@ def _extract_sections_from_pages(reader: PdfReader) -> list[Section]:
             if _is_section_header(line):
                 # Save previous section (if it had substantial body AND valid title)
                 if current_section is not None:
-                    if _has_substantial_body(current_section.body) and _is_real_section_title(
-                        current_section.title
-                    ):
+                    if _has_substantial_body(current_section.body) and _is_real_section_title(current_section.title):
                         if current_section.title not in seen_titles:
                             seen_titles.add(current_section.title)
                             all_sections.append(current_section)
@@ -210,9 +208,7 @@ def _extract_sections_from_pages(reader: PdfReader) -> list[Section]:
 
     # Save last section (only if substantial AND valid title)
     if current_section is not None:
-        if _has_substantial_body(current_section.body) and _is_real_section_title(
-            current_section.title
-        ):
+        if _has_substantial_body(current_section.body) and _is_real_section_title(current_section.title):
             if current_section.title not in seen_titles:
                 seen_titles.add(current_section.title)
                 all_sections.append(current_section)

@@ -278,11 +278,11 @@ def save_script_text(script: PodcastScript, output_path: str | Path) -> Path:
 
     for chunk in script.chunks:
         if chunk.is_intro:
-            lines.append(f"[INTRO]")
+            lines.append("[INTRO]")
         elif chunk.is_outro:
-            lines.append(f"[OUTRO]")
+            lines.append("[OUTRO]")
         elif chunk.is_transition:
-            lines.append(f"[TRANSITION]")
+            lines.append("[TRANSITION]")
         elif chunk.section_title and chunk.id.startswith("title_"):
             lines.append(f"[SECTION {chunk.section_number}] {chunk.section_title}")
         else:

@@ -8,18 +8,17 @@ from pathlib import Path
 
 import pytest
 
-# Ensure the project root is on sys.path for imports
-_project_root = Path(__file__).resolve().parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-from preprocess.pdf_extractor import DocumentStructure, Section, extract_and_parse
+from preprocess.pdf_extractor import DocumentStructure, extract_and_parse
 from preprocess.tts_script_builder import (
-    PodcastScript,
     build_podcast_script,
     save_script_json,
     save_script_text,
 )
+
+# Ensure the project root is on sys.path for imports (for local testing)
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 EXAMPLE_PDF = "example-data/Seksuologia_opracowane_tezy.pdf"
 OUTPUT_DIR = "tests/output"
@@ -96,7 +95,11 @@ class TestBuildPodcastScript:
     def test_body_chunks_exist(self) -> None:
         doc = extract_and_parse(EXAMPLE_PDF)
         script = build_podcast_script(doc)
-        body_chunks = [c for c in script.chunks if not c.is_intro and not c.is_outro and not c.is_transition and not c.id.startswith("title_")]
+        body_chunks = [
+            c
+            for c in script.chunks
+            if not c.is_intro and not c.is_outro and not c.is_transition and not c.id.startswith("title_")
+        ]
         assert len(body_chunks) > 0
 
 
@@ -105,21 +108,25 @@ class TestNormalizeText:
 
     def test_expand_np(self) -> None:
         from preprocess.tts_script_builder import _normalize_text
+
         result = _normalize_text("np.")
         assert result == "na przykład"
 
     def test_expand_kk(self) -> None:
         from preprocess.tts_script_builder import _normalize_text
+
         result = _normalize_text("art. 197 kodeks karny")
         assert "kodeks karny" in result
 
     def test_expand_tzw(self) -> None:
         from preprocess.tts_script_builder import _normalize_text
+
         result = _normalize_text("tzw.")
         assert result == "tak zwany"
 
     def test_normalize_spacing(self) -> None:
         from preprocess.tts_script_builder import _normalize_text
+
         result = _normalize_text("test    multiple    spaces")
         assert "test multiple spaces" == result
 

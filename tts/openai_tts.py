@@ -40,10 +40,7 @@ class OpenAITTSConfig:
 
     def __post_init__(self) -> None:
         if self.voice not in self.SUPPORTED_VOICES:
-            raise ValueError(
-                f"Unsupported voice '{self.voice}'. "
-                f"Supported: {sorted(self.SUPPORTED_VOICES)}"
-            )
+            raise ValueError(f"Unsupported voice '{self.voice}'. Supported: {sorted(self.SUPPORTED_VOICES)}")
         if not 0.25 <= self.speed <= 2.0:
             raise ValueError("Speed must be between 0.25 and 2.0")
 
@@ -56,8 +53,7 @@ class OpenAITTSConfig:
         key = os.getenv("OPENAI_API_KEY")
         if not key:
             raise RuntimeError(
-                "No OpenAI API key provided. Set OPENAI_API_KEY env var "
-                "or pass api_key to OpenAITTSConfig."
+                "No OpenAI API key provided. Set OPENAI_API_KEY env var or pass api_key to OpenAITTSConfig."
             )
         return key
 
@@ -138,9 +134,7 @@ def generate_audio_chunk(
             if not seg:
                 continue
             if current_len + len(seg) > config.max_chars_per_call and current_segment:
-                all_audio.append(
-                    _call_api(client, config, " ".join(current_segment))
-                )
+                all_audio.append(_call_api(client, config, " ".join(current_segment)))
                 current_segment = [seg]
                 current_len = len(seg)
             else:
@@ -230,4 +224,4 @@ def load_manifest(manifest_path: str | Path) -> dict[str, Any]:
     path = Path(manifest_path)
     if not path.exists():
         raise FileNotFoundError(f"Manifest not found: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8"))  # type: ignore[no-any-return]

@@ -10,9 +10,15 @@ Supported backends:
 
 from tts.local_tts import (
     LocalTTSConfig,
-    generate_podcast_audio as generate_podcast_audio_local,
     generate_test_samples,
+)
+from tts.local_tts import (
+    generate_podcast_audio as generate_podcast_audio_local,
+)
+from tts.local_tts import (
     load_manifest as load_manifest_local,
+)
+from tts.local_tts import (
     save_audio_file as save_audio_file_local,
 )
 from tts.openai_tts import (

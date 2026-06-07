@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
 import wave
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -67,7 +66,7 @@ def check_health(config: LocalTTSConfig) -> dict[str, Any]:
     try:
         response = requests.get(config.health_url, timeout=5)
         response.raise_for_status()
-        return response.json()
+        return response.json()  # type: ignore[no-any-return]
     except requests.RequestException as e:
         raise RuntimeError(f"TTS server health check failed: {e}")
 
@@ -88,7 +87,7 @@ def create_job(config: LocalTTSConfig, text: str) -> dict[str, Any]:
             timeout=10,
         )
         response.raise_for_status()
-        return response.json()
+        return response.json()  # type: ignore[no-any-return]
     except requests.RequestException as e:
         raise RuntimeError(f"Failed to create TTS job: {e}")
 
@@ -101,7 +100,7 @@ def get_job_status(config: LocalTTSConfig, job_id: str) -> dict[str, Any]:
         if response.status_code == 404:
             raise ValueError(f"Job {job_id} not found")
         response.raise_for_status()
-        return response.json()
+        return response.json()  # type: ignore[no-any-return]
     except requests.RequestException as e:
         raise RuntimeError(f"Failed to get job status: {e}")
 
@@ -113,9 +112,7 @@ def download_audio(config: LocalTTSConfig, job_id: str) -> bytes:
         response = requests.get(url, timeout=30)
         if response.status_code == 400:
             status = get_job_status(config, job_id)
-            raise ValueError(
-                f"Job is not completed. Current status: {status.get('status')}"
-            )
+            raise ValueError(f"Job is not completed. Current status: {status.get('status')}")
         if response.status_code == 404:
             raise ValueError(f"Job {job_id} not found")
         response.raise_for_status()
@@ -153,10 +150,8 @@ def generate_audio_chunk(config: LocalTTSConfig, chunk: TTSChunk) -> bytes:
     if not job_id:
         raise ValueError("No job_id returned from server")
 
-    # Wait for completion
-    status = wait_for_job_completion(config, job_id)
-
-    # Download audio
+    # Wait for completion and download audio
+    wait_for_job_completion(config, job_id)
     audio_bytes = download_audio(config, job_id)
 
     return audio_bytes
@@ -186,7 +181,7 @@ def generate_podcast_audio(
     results: dict[str, str] = {}
 
     for i, chunk in enumerate(script.chunks):
-        print(f"[{i+1}/{len(script.chunks)}] Generating audio for chunk: {chunk.id} ({len(chunk.text)} chars)")
+        print(f"[{i + 1}/{len(script.chunks)}] Generating audio for chunk: {chunk.id} ({len(chunk.text)} chars)")
         try:
             audio_bytes = generate_audio_chunk(config, chunk)
         except Exception as e:
@@ -263,7 +258,7 @@ def load_manifest(manifest_path: str | Path) -> dict[str, Any]:
     path = Path(manifest_path)
     if not path.exists():
         raise FileNotFoundError(f"Manifest not found: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
 
 
 def generate_single_test_chunk(config: LocalTTSConfig, text: str) -> tuple[str, bytes]:
@@ -273,7 +268,7 @@ def generate_single_test_chunk(config: LocalTTSConfig, text: str) -> tuple[str, 
     if not job_id:
         raise ValueError("No job_id returned from server")
 
-    status = wait_for_job_completion(config, job_id)
+    wait_for_job_completion(config, job_id)
     audio_bytes = download_audio(config, job_id)
 
     return job_id, audio_bytes

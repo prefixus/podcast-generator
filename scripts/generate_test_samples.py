@@ -11,7 +11,6 @@ and generates a few test WAV files to validate the integration.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from tts import LocalTTSConfig, generate_test_samples
 

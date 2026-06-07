@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "openai>=1.30.0",
     "pypdf>=6.0.0",
+    "requests>=2.31.0",
 ]
 
 [dependency-groups]
@@ -67,3 +68,7 @@ cmd = "pytest"
 [tool.poe.tasks.dev-lint]
 help = "Run mypy type checks"
 cmd = "mypy ."
+
+[tool.poe.tasks.generate-test-samples]
+help = "Generate test audio samples from local TTS server"
+cmd = "python -m scripts.generate_test_samples"

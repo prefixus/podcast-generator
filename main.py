@@ -1,14 +1,20 @@
 """Podcast Creator – PDF-to-TTS full pipeline.
 
 Extracts structured content from PDF documents, builds TTS-ready
-scripts, and generates audio files via the OpenAI Speech API.
+scripts, and generates audio files via supported TTS backends:
+
+  - OpenAI Speech API (default)
+  - Local FastAPI server (e.g. Higgs Audio v3)
 
 Usage:
     # Preprocess only (script generation):
     python main.py
 
-    # Full pipeline (script + audio generation):
+    # Full pipeline with OpenAI TTS:
     python main.py --tts
+
+    # Full pipeline with local TTS server:
+    python main.py --tts --local-tts --tts-host 127.0.0.1 --tts-port 8000
 
     # Custom PDF with TTS:
     python main.py path/to/file.pdf --tts --voice nova --model tts-1-hd
@@ -26,19 +32,26 @@ from preprocess.tts_script_builder import (
     save_script_json,
     save_script_text,
 )
-from tts import OpenAITTSConfig, generate_podcast_audio
+from tts import (
+    LocalTTSConfig,
+    OpenAITTSConfig,
+    generate_podcast_audio,
+    generate_podcast_audio_local,
+)
 
 
 def process_pdf(
     pdf_path: str | Path,
     output_dir: str | Path = "output",
     generate_audio: bool = False,
+    use_local_tts: bool = False,
     tts_config: OpenAITTSConfig | None = None,
+    local_tts_config: LocalTTSConfig | None = None,
 ) -> PodcastScript:
     """Full pipeline: PDF → structured sections → TTS-ready script.
 
-    Optionally generates audio files via OpenAI Speech API when
-    ``generate_audio=True``.
+    Optionally generates audio files via OpenAI Speech API or a local
+    FastAPI TTS server when ``generate_audio=True``.
     """
     pdf_path = Path(pdf_path)
     output_dir = Path(output_dir)
@@ -55,12 +68,18 @@ def process_pdf(
     save_script_json(script, output_dir / f"{stem}_script.json")
     save_script_text(script, output_dir / f"{stem}_script.txt")
 
-    # Step 4 (optional): Generate audio via OpenAI TTS
+    # Step 4 (optional): Generate audio
     if generate_audio:
-        if tts_config is None:
-            tts_config = OpenAITTSConfig(output_dir=output_dir / "audio")
-        audio_map = generate_podcast_audio(script, tts_config)
-        print(f"Generated {len(audio_map)} audio files")
+        if use_local_tts:
+            if local_tts_config is None:
+                local_tts_config = LocalTTSConfig(output_dir=output_dir / "audio")
+            audio_map = generate_podcast_audio_local(script, local_tts_config)
+            print(f"Generated {len(audio_map)} audio files via local TTS")
+        else:
+            if tts_config is None:
+                tts_config = OpenAITTSConfig(output_dir=output_dir / "audio")
+            audio_map = generate_podcast_audio(script, tts_config)
+            print(f"Generated {len(audio_map)} audio files via OpenAI TTS")
 
     # Print summary
     print(f"Document: {doc.title}")
@@ -78,16 +97,22 @@ def main() -> None:
 
     # Simple argument parsing
     generate_audio = "--tts" in args or "--audio" in args
+    use_local_tts = "--local-tts" in args
     tts_voice = "alloy"
     tts_model = "tts-1"
     output_dir = "output"
     pdf_file = "example-data/Seksuologia_opracowane_tezy.pdf"
+    tts_host = "127.0.0.1"
+    tts_port = 8000
+    tts_language = "pl"
 
     i = 0
     while i < len(args):
         arg = args[i]
         if arg in ("--tts", "--audio"):
             pass  # handled above
+        elif arg == "--local-tts":
+            use_local_tts = True
         elif arg == "--voice" and i + 1 < len(args):
             tts_voice = args[i + 1]
             i += 1
@@ -97,17 +122,49 @@ def main() -> None:
         elif arg == "--output" and i + 1 < len(args):
             output_dir = args[i + 1]
             i += 1
+        elif arg == "--tts-host" and i + 1 < len(args):
+            tts_host = args[i + 1]
+            i += 1
+        elif arg == "--tts-port" and i + 1 < len(args):
+            try:
+                tts_port = int(args[i + 1])
+            except ValueError:
+                print(f"Warning: Invalid port '{args[i + 1]}', using default {tts_port}")
+            i += 1
+        elif arg == "--tts-language" and i + 1 < len(args):
+            tts_language = args[i + 1]
+            i += 1
         elif not arg.startswith("-"):
             pdf_file = arg
         i += 1
 
-    tts_config = OpenAITTSConfig(
-        voice=tts_voice,
-        model=tts_model,
-        output_dir=Path(output_dir) / "audio",
-    )
-
-    process_pdf(pdf_file, output_dir, generate_audio=generate_audio, tts_config=tts_config)
+    if use_local_tts:
+        local_tts_config = LocalTTSConfig(
+            host=tts_host,
+            port=tts_port,
+            language=tts_language,
+            output_dir=Path(output_dir) / "audio",
+        )
+        process_pdf(
+            pdf_file,
+            output_dir,
+            generate_audio=generate_audio,
+            use_local_tts=True,
+            local_tts_config=local_tts_config,
+        )
+    else:
+        tts_config = OpenAITTSConfig(
+            voice=tts_voice,
+            model=tts_model,
+            output_dir=Path(output_dir) / "audio",
+        )
+        process_pdf(
+            pdf_file,
+            output_dir,
+            generate_audio=generate_audio,
+            use_local_tts=False,
+            tts_config=tts_config,
+        )
 
 
 if __name__ == "__main__":

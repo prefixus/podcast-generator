@@ -12,6 +12,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pylance",
+    "pyright>=1.1.0",
     "ruff>=0.9.0",
     "mypy>=1.14.0",
     "pytest>=8.3.0",
@@ -67,8 +69,11 @@ help = "Run pytest"
 cmd = "pytest"
 
 [tool.poe.tasks.dev-lint]
-help = "Run mypy type checks"
-cmd = "mypy ."
+help = "Run mypy and pyright type checks"
+sequence = [
+    { cmd = "mypy ." },
+    { cmd = "pyright ." },
+]
 
 [tool.poe.tasks.generate-test-samples]
 help = "Generate test audio samples from local TTS server"

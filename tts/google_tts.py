@@ -106,11 +106,12 @@ def _call_api(
         speaking_rate=config.speaking_rate,
         pitch=config.pitch,
     )
-    response = client.synthesize_speech(
-        request=input_text,
+    request = texttospeech.SynthesizeSpeechRequest(
+        input=input_text,
         voice=voice_params,
         audio_config=audio_config,
     )
+    response = client.synthesize_speech(request=request)
     return response.audio_content
 
 

@@ -82,9 +82,9 @@ def _normalize_text(text: str) -> str:
 def _build_introduction(doc: DocumentStructure) -> TTSChunk:
     """Build podcast introduction chunk."""
     intro_text = (
-        f"Witajcie w odcinku podcastu poświęconemu tematowi: "
+        f"Witajcie w odcinku podcastu poświęconym tematowi: "
         f"{doc.title}. "
-        f"To jest cykl {len(doc.sections)} lektów, obejmujący "
+        f"To jest cykl {len(doc.sections)} tematów, obejmujący "
         f"całą tematykę prezentowaną w materiale źródłowym. "
         f"Przejdźmy do pierwszego wątku."
     )
@@ -123,8 +123,8 @@ def _build_transitions(sections: list[Section]) -> list[TTSChunk]:
         # Create a natural-sounding transition
         transition_text = (
             f"Przechodzimy do kolejnego tematu. "
-            f"W poprzednim odcinku poruszyliśmy sprawę "
-            f"{prev.title.lower()}. "
+            f"W poprzednim odcinku poruszyliśmy temat: "
+            f"{prev.title}. "
             f"Teraz zajmiemy się tematem: {section.title}."
         )
         transitions.append(
@@ -173,28 +173,36 @@ def _chunk_body_for_tts(body: str, max_chars: int = 3000) -> list[str]:
     return chunks
 
 
-def build_podcast_script(doc: DocumentStructure) -> PodcastScript:
-    """Build a complete TTS-ready podcast script from parsed document."""
+def build_podcast_script(doc: DocumentStructure, max_chapters: int | None = None) -> PodcastScript:
+    """Build a complete TTS-ready podcast script from parsed document.
+
+    Args:
+        doc: Parsed document structure.
+        max_chapters: If set, only process the first N chapters (sections).
+    """
+    sections = doc.sections
+    if max_chapters is not None:
+        sections = sections[:max_chapters]
     chunks: list[TTSChunk] = []
 
     # Add introduction
     chunks.append(_build_introduction(doc))
 
-    # Process each section
-    for section in doc.sections:
+    # Process each section (filtered if max_chapters is set)
+    for section in sections:
         # Add transition (except before first section)
         if section.number > 1:
-            # Find the right transition
+            # Find the right transition (within filtered sections)
             prev_section = None
-            for s in doc.sections:
+            for s in sections:
                 if s.number == section.number - 1:
                     prev_section = s
                     break
             if prev_section:
                 transition_text = (
                     f"Przechodzimy do kolejnego tematu. "
-                    f"W poprzednim odcinku poruszyliśmy sprawę "
-                    f"{prev_section.title.lower()}. "
+                    f"W poprzednim odcinku poruszyliśmy temat: "
+                    f"{prev_section.title}. "
                     f"Teraz zajmiemy się tematem: {section.title}."
                 )
                 chunks.append(
@@ -210,7 +218,7 @@ def build_podcast_script(doc: DocumentStructure) -> PodcastScript:
         # Add section title (spoken clearly)
         title_chunk = TTSChunk(
             id=f"title_{section.number}",
-            text=f"Temat numer {section.number}: {section.title}.",
+            text=_normalize_text(f"Temat numer {section.number}: {section.title}."),
             section_number=section.number,
             section_title=section.title,
         )

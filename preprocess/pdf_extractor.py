@@ -199,6 +199,20 @@ def _extract_sections_from_pages(reader: PdfReader) -> list[Section]:
             if _is_summary_item(line):
                 continue
 
+            # If we haven't started the body yet, check if this line continues the title
+            if current_section is not None and not current_section.body:
+                title_words = current_section.title.split()
+                last_word = title_words[-1].lower() if title_words else ""
+                ends_with_dash = (
+                    current_section.title.rstrip().endswith(("-", "–", "—", ","))
+                    or last_word in ("i", "lub", "a", "oraz")
+                )
+                starts_with_lower = bool(re.match(r"^[a-zęóąśłżńćż]", line))
+                is_article = bool(re.match(r"^(art\b|ust\b|par\b|\d+)", line, re.IGNORECASE))
+                if (starts_with_lower or ends_with_dash) and not is_article:
+                    current_section.title += " " + line
+                    continue
+
             # Regular body text
             if current_section is not None:
                 if current_section.body:

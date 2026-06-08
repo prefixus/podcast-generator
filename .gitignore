@@ -16,3 +16,11 @@ wheels/
 example-data/*
 output/*
 tests/output/*
+
+# Google API Credentials / Tokens
+*client_secret*.json
+*oauth_token*.json
+.tts_oauth_token.json
+
+# OS metadata
+.DS_Store

@@ -26,6 +26,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -36,6 +37,7 @@ from preprocess.tts_script_builder import (
     save_script_json,
     save_script_text,
 )
+from preprocess.proofreader import proofread_script
 from tts import (
     GoogleTTSConfig,
     LocalTTSConfig,
@@ -52,9 +54,13 @@ def process_pdf(
     generate_audio: bool = False,
     use_local_tts: bool = False,
     use_google_tts: bool = False,
+    max_chapters: int | None = None,
     tts_config: OpenAITTSConfig | None = None,
     local_tts_config: LocalTTSConfig | None = None,
     google_tts_config: GoogleTTSConfig | None = None,
+    use_llm_proofread: bool = False,
+    proofread_model: str = "google/gemma-4-26b-a4b-qat",
+    merge_format: str = "mp3",
 ) -> PodcastScript:
     """Full pipeline: PDF → structured sections → TTS-ready script.
 
@@ -68,8 +74,12 @@ def process_pdf(
     # Step 1: Extract and parse PDF
     doc = extract_and_parse(pdf_path)
 
-    # Step 2: Build podcast script
-    script = build_podcast_script(doc)
+    # Step 2: Build podcast script (with optional chapter limit)
+    script = build_podcast_script(doc, max_chapters=max_chapters)
+
+    # Step 2.5: Proofread script using local LLM
+    if use_llm_proofread:
+        proofread_script(script, preferred_model=proofread_model)
 
     # Step 3: Save outputs
     stem = pdf_path.stem
@@ -93,6 +103,17 @@ def process_pdf(
                 tts_config = OpenAITTSConfig(output_dir=output_dir / "audio")
             audio_map = generate_podcast_audio(script, tts_config)
             print(f"Generated {len(audio_map)} audio files via OpenAI TTS")
+
+        # Step 5: Merge and convert to final podcast audio file
+        from tts.postprocessor import postprocess_podcast_audio
+        merged_file = postprocess_podcast_audio(
+            script=script,
+            audio_map=audio_map,
+            output_dir=Path(output_dir),
+            output_format=merge_format,
+        )
+        if merged_file:
+            print(f"\n[SUKCES] Połączony plik audio podcastu został zapisany w: {merged_file}")
 
     # Print summary
     print(f"Document: {doc.title}")
@@ -122,6 +143,10 @@ def main() -> None:
     google_voice = "pl-PL-Wavenet-A"
     google_language = "pl-PL"
     google_credentials = None
+    max_chapters: int | None = None
+    use_llm_proofread = "--proofread" in args
+    proofread_model = "google/gemma-4-26b-a4b-qat"
+    merge_format = "mp3"
 
     i = 0
     while i < len(args):
@@ -132,6 +157,12 @@ def main() -> None:
             use_local_tts = True
         elif arg == "--google-tts":
             use_google_tts = True
+        elif arg == "--max-chapters" and i + 1 < len(args):
+            try:
+                max_chapters = int(args[i + 1])
+            except ValueError:
+                print(f"Warning: Invalid chapters '{args[i + 1]}', using all chapters")
+            i += 1
         elif arg == "--voice" and i + 1 < len(args):
             tts_voice = args[i + 1]
             i += 1
@@ -162,6 +193,14 @@ def main() -> None:
         elif arg == "--google-credentials" and i + 1 < len(args):
             google_credentials = args[i + 1]
             i += 1
+        elif arg == "--proofread":
+            use_llm_proofread = True
+        elif arg == "--proofread-model" and i + 1 < len(args):
+            proofread_model = args[i + 1]
+            i += 1
+        elif arg == "--merge-format" and i + 1 < len(args):
+            merge_format = args[i + 1]
+            i += 1
         elif not arg.startswith("-"):
             pdf_file = arg
         i += 1
@@ -178,7 +217,11 @@ def main() -> None:
             output_dir,
             generate_audio=generate_audio,
             use_local_tts=True,
+            max_chapters=max_chapters,
             local_tts_config=local_tts_config,
+            use_llm_proofread=use_llm_proofread,
+            proofread_model=proofread_model,
+            merge_format=merge_format,
         )
     elif use_google_tts:
         google_tts_config = GoogleTTSConfig(
@@ -187,12 +230,18 @@ def main() -> None:
             credentials_file=google_credentials,
             output_dir=Path(output_dir) / "audio",
         )
+        # Set OAuth client secret file path for Google TTS
+        os.environ.setdefault("GOOGLE_OAUTH_CLIENT_SECRET_FILE", "google_oauth_client_secret.json")
         process_pdf(
             pdf_file,
             output_dir,
             generate_audio=generate_audio,
             use_google_tts=True,
+            max_chapters=max_chapters,
             google_tts_config=google_tts_config,
+            use_llm_proofread=use_llm_proofread,
+            proofread_model=proofread_model,
+            merge_format=merge_format,
         )
     else:
         tts_config = OpenAITTSConfig(
@@ -205,7 +254,11 @@ def main() -> None:
             output_dir,
             generate_audio=generate_audio,
             use_local_tts=False,
+            max_chapters=max_chapters,
             tts_config=tts_config,
+            use_llm_proofread=use_llm_proofread,
+            proofread_model=proofread_model,
+            merge_format=merge_format,
         )
 
 

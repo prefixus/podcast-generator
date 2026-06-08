@@ -28,8 +28,8 @@ class LocalTTSConfig:
     voice: str = "default"
     emotion: str = "neutral"
     output_dir: str | Path = "output/audio"
-    max_retries: int = 10
-    retry_delay: float = 2.0
+    max_retries: int = 60
+    retry_delay: float = 5.0
 
     @property
     def base_url(self) -> str:
@@ -64,7 +64,7 @@ class LocalTTSConfig:
 def check_health(config: LocalTTSConfig) -> dict[str, Any]:
     """Check if the TTS server is running."""
     try:
-        response = requests.get(config.health_url, timeout=5)
+        response = requests.get(config.health_url, timeout=10)
         response.raise_for_status()
         return response.json()  # type: ignore[no-any-return]
     except requests.RequestException as e:
@@ -84,7 +84,7 @@ def create_job(config: LocalTTSConfig, text: str) -> dict[str, Any]:
             config.jobs_url,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=10,
+            timeout=60,
         )
         response.raise_for_status()
         return response.json()  # type: ignore[no-any-return]
@@ -109,7 +109,7 @@ def download_audio(config: LocalTTSConfig, job_id: str) -> bytes:
     """Download generated audio for a completed job."""
     url = f"{config.jobs_url}/audio/{job_id}"
     try:
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=60)
         if response.status_code == 400:
             status = get_job_status(config, job_id)
             raise ValueError(f"Job is not completed. Current status: {status.get('status')}")
@@ -143,14 +143,16 @@ def wait_for_job_completion(config: LocalTTSConfig, job_id: str) -> dict[str, An
 
 
 def generate_audio_chunk(config: LocalTTSConfig, chunk: TTSChunk) -> bytes:
-    """Generate audio for a single TTS chunk using local server."""
-    # Create job
+    """Generate audio for a single TTS chunk using local server.
+
+    BLOCKING version: creates job, waits for completion, downloads audio.
+    Use generate_podcast_audio for batch async processing.
+    """
     job_response = create_job(config, chunk.text)
     job_id = job_response.get("job_id")
     if not job_id:
         raise ValueError("No job_id returned from server")
 
-    # Wait for completion and download audio
     wait_for_job_completion(config, job_id)
     audio_bytes = download_audio(config, job_id)
 
@@ -162,6 +164,11 @@ def generate_podcast_audio(
     config: LocalTTSConfig | None = None,
 ) -> dict[str, str]:
     """Generate audio for every chunk in a PodcastScript using local TTS.
+
+    Uses a batched approach optimized for single-worker Higgs servers:
+    submits a small batch of jobs, waits for them to complete, then
+    submits the next batch. This avoids overwhelming the server's
+    single worker and prevents request timeouts.
 
     Returns a mapping of chunk id → saved file path.
     """
@@ -178,21 +185,99 @@ def generate_podcast_audio(
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    results: dict[str, str] = {}
+    # Batch size: match the server's single-worker capacity.
+    # Submit 2 jobs at a time, wait for both to complete, then next batch.
+    BATCH_SIZE = 2
 
-    for i, chunk in enumerate(script.chunks):
-        print(f"[{i + 1}/{len(script.chunks)}] Generating audio for chunk: {chunk.id} ({len(chunk.text)} chars)")
-        try:
-            audio_bytes = generate_audio_chunk(config, chunk)
-        except Exception as e:
-            print(f"  Error generating audio for {chunk.id}: {e}")
+    chunks = script.chunks
+    total = len(chunks)
+    results: dict[str, str] = {}
+    failed_chunks: list[str] = []
+    processed = 0
+
+    print(f"Processing {total} chunks in batches of {BATCH_SIZE}...")
+
+    while processed < total:
+        # Submit a batch
+        batch = chunks[processed: processed + BATCH_SIZE]
+        batch_chunk_to_job: dict[str, str] = {}  # chunk_id -> job_id (local to this batch)
+
+        for chunk in batch:
+            print(f"  Submitting: {chunk.id} ({len(chunk.text)} chars)")
+            try:
+                job_response = create_job(config, chunk.text)
+                job_id = job_response.get("job_id")
+                if job_id:
+                    batch_chunk_to_job[chunk.id] = job_id
+                else:
+                    failed_chunks.append(chunk.id)
+                    print(f"    ERROR: No job_id returned for {chunk.id}")
+            except Exception as e:
+                failed_chunks.append(chunk.id)
+                print(f"    ERROR: {e}")
+
+        if not batch_chunk_to_job:
+            processed += len(batch)
             continue
 
-        # Save WAV file
-        audio_path = save_audio_file(audio_bytes, output_dir / f"{chunk.id}.wav")
-        results[chunk.id] = str(audio_path)
+        # Wait for the entire batch to complete
+        print(f"  Waiting for {len(batch_chunk_to_job)} batch job(s) to complete...")
+        batch_completed = 0
 
-    # Save manifest for later merging
+        while batch_completed < len(batch_chunk_to_job):
+            newly_done: list[str] = []
+
+            for chunk_id, job_id in batch_chunk_to_job.items():
+                if chunk_id in results:
+                    continue  # already downloaded
+
+                try:
+                    status = get_job_status(config, job_id)
+                    job_status = status.get("status")
+
+                    if job_status == "completed":
+                        newly_done.append(chunk_id)
+                    elif job_status == "failed":
+                        error_msg = status.get("error_message", "Unknown error")
+                        print(f"  [FAIL] {chunk_id}: {error_msg}")
+                        if chunk_id not in failed_chunks:
+                            failed_chunks.append(chunk_id)
+
+                except Exception as e:
+                    print(f"  [ERROR checking {chunk_id}]: {e}")
+
+            # Download completed audio
+            for chunk_id in newly_done:
+                try:
+                    job_id = batch_chunk_to_job[chunk_id]
+                    audio_bytes = download_audio(config, job_id)
+                    audio_path = save_audio_file(audio_bytes, output_dir / f"{chunk_id}.wav")
+                    results[chunk_id] = str(audio_path)
+                    batch_completed += 1
+                    print(f"  [DONE] {chunk_id} -> {audio_path.name}")
+                except Exception as e:
+                    print(f"  [DOWNLOAD FAIL] {chunk_id}: {e}")
+                    if chunk_id not in failed_chunks:
+                        failed_chunks.append(chunk_id)
+
+            if batch_completed < len(batch_chunk_to_job):
+                time.sleep(config.retry_delay)
+
+        processed += len(batch)
+        print(f"  Progress: {processed}/{total} submitted, {len(results)} completed")
+
+    _save_manifest(script, output_dir, results, failed_chunks)
+    print(f"\nCompleted: {len(results)}/{total} chunks generated successfully.")
+    return results
+
+
+def _save_manifest(
+    script: PodcastScript,
+    output_dir: Path,
+    results: dict[str, str],
+    failed_chunks: list[str] | None = None,
+) -> None:
+    """Save the manifest JSON with audio file mappings."""
     manifest_path = output_dir / "manifest.json"
     manifest_data = {
         "title": script.title,
@@ -207,6 +292,7 @@ def generate_podcast_audio(
                 "is_outro": chunk.is_outro,
                 "is_transition": chunk.is_transition,
                 "audio_file": results.get(chunk.id, ""),
+                "status": "failed" if chunk.id in (failed_chunks or []) else "ok",
             }
             for chunk in script.chunks
         ],
@@ -215,9 +301,35 @@ def generate_podcast_audio(
         json.dumps(manifest_data, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-
     print(f"Manifest saved to: {manifest_path}")
-    return results
+
+
+def _save_empty_manifest(script: PodcastScript, output_dir: Path) -> None:
+    """Save an empty manifest when no jobs were submitted."""
+    manifest_path = output_dir / "manifest.json"
+    manifest_data = {
+        "title": script.title,
+        "metadata": script.metadata,
+        "chunks": [
+            {
+                "id": chunk.id,
+                "text": chunk.text,
+                "section_number": chunk.section_number,
+                "section_title": chunk.section_title,
+                "is_intro": chunk.is_intro,
+                "is_outro": chunk.is_outro,
+                "is_transition": chunk.is_transition,
+                "audio_file": "",
+                "status": "failed",
+            }
+            for chunk in script.chunks
+        ],
+    }
+    manifest_path.write_text(
+        json.dumps(manifest_data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(f"Manifest saved to: {manifest_path}")
 
 
 def save_audio_file(audio_bytes: bytes, output_path: str | Path) -> Path:

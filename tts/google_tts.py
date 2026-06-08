@@ -14,12 +14,11 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import requests
-from google_auth_oauthlib.flow import InstalledAppFlow
 
 from preprocess.tts_script_builder import PodcastScript, TTSChunk
 
@@ -92,14 +91,14 @@ def _get_oauth_credentials() -> Any | None:
     token_file = Path(".tts_oauth_token.json")
     if token_file.exists():
         from google.oauth2.credentials import Credentials
+
         return Credentials.from_authorized_user_file(str(token_file), SCOPES)
 
     # Load client config and run OAuth flow
-    with open(client_secret_file, "r") as f:
+    with open(client_secret_file) as f:
         client_secrets = json.load(f)
 
     from google_auth_oauthlib.flow import Flow
-    import webbrowser
 
     flow = Flow.from_client_config(
         client_secrets,
@@ -121,6 +120,7 @@ def _get_oauth_credentials() -> Any | None:
     # Extract the code from a full redirect URL if needed
     if "code=" in authorization_response:
         from urllib.parse import urlparse
+
         parsed = urlparse(authorization_response)
         authorization_code = dict(__import__("urllib.parse").parse_qsl(parsed.query))["code"]
     else:
@@ -158,8 +158,10 @@ def _make_authenticated_request(
 
     # Get an access token
     import google.oauth2.credentials
+
     if isinstance(credentials, google.oauth2.credentials.Credentials):
         import google.auth.transport.requests
+
         credentials.refresh(google.auth.transport.requests.Request())
         access_token = credentials.token
     else:
@@ -211,10 +213,7 @@ def _synthesize_via_rest(
     # Try API key
     api_key = _get_api_key()
     if api_key:
-        url = (
-            f"https://texttospeech.googleapis.com/v1/text:synthesize"
-            f"?key={api_key}"
-        )
+        url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}"
         payload = {
             "input": {"text": text},
             "voice": {
@@ -264,6 +263,7 @@ def _synthesize_via_rest(
 def _b64decode(b64: str) -> bytes:
     """Base64 decode a string."""
     import base64
+
     return base64.b64decode(b64)
 
 

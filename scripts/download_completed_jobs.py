@@ -4,8 +4,6 @@ This script queries the server for all jobs, identifies completed ones,
 and downloads their audio files to the output directory.
 """
 
-import json
-import sys
 import wave
 from pathlib import Path
 
@@ -88,7 +86,7 @@ def main():
         else:
             print(f"  Unknown status '{status}' for job {job_id[:8]}...")
 
-    print(f"\n=== Job Summary ===")
+    print("\n=== Job Summary ===")
     print(f"  Completed:  {len(completed_jobs)}")
     print(f"  Failed:     {len(failed_jobs)}")
     print(f"  Processing: {len(processing_jobs)}")
@@ -108,7 +106,6 @@ def main():
         if audio_bytes:
             output_path = OUTPUT_DIR / f"{job_id}.wav"
             try:
-                import io
                 save_wav(audio_bytes, output_path)
                 downloaded += 1
                 print(f"    -> Saved: {output_path.name} ({output_path.stat().st_size / 1024:.0f} KB)")
@@ -116,7 +113,7 @@ def main():
                 print(f"    -> SAVE ERROR: {e}")
                 download_errors += 1
         else:
-            print(f"    -> DOWNLOAD FAILED")
+            print("    -> DOWNLOAD FAILED")
             download_errors += 1
 
     # Print failed jobs summary
@@ -147,7 +144,7 @@ def main():
             print(f"  Job: {job_id[:8]}... - {text}")
 
     # Print final stats
-    print(f"\n=== Final Stats ===")
+    print("\n=== Final Stats ===")
     print(f"  Downloaded:    {downloaded}")
     print(f"  Download errs: {download_errors}")
     print(f"  Failed jobs:   {len(failed_jobs)}")
@@ -161,4 +158,5 @@ def main():
 
 if __name__ == "__main__":
     import io  # needed for save_wav
+
     main()

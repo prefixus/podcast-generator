@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import subprocess
-from pathlib import Path
 import wave
+from pathlib import Path
+
 from preprocess.tts_script_builder import PodcastScript
 
 
@@ -24,21 +25,24 @@ def merge_wav_files(audio_files: list[Path], output_wav: Path) -> bool:
     print(f"Łączenie {len(valid_files)} plików WAV do: {output_wav}...")
     try:
         output_wav.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Read the params from the first valid file
-        with wave.open(str(valid_files[0]), 'rb') as first_file:
+        with wave.open(str(valid_files[0]), "rb") as first_file:
             params = first_file.getparams()
 
         # Write all frames to output WAV
-        with wave.open(str(output_wav), 'wb') as merged_file:
+        with wave.open(str(output_wav), "wb") as merged_file:
             merged_file.setparams(params)
             for file_path in valid_files:
-                with wave.open(str(file_path), 'rb') as f:
+                with wave.open(str(file_path), "rb") as f:
                     # Verify matching audio parameters
                     if f.getparams()[:3] != params[:3]:
-                        print(f"Ostrzeżenie: Plik {file_path.name} ma inne parametry audio niż pierwszy plik. Może brzmieć nieprawidłowo.")
+                        print(
+                            f"Ostrzeżenie: Plik {file_path.name} ma inne parametry audio niż pierwszy plik. "
+                            "Może brzmieć nieprawidłowo."
+                        )
                     merged_file.writeframes(f.readframes(f.getnframes()))
-        
+
         print("Pomyślnie złączono pliki WAV.")
         return True
     except Exception as e:
@@ -71,7 +75,7 @@ def convert_wav_to_mp3_or_aac(input_wav: Path, output_file: Path) -> bool:
         else:  # .m4a or .aac
             cmd = ["ffmpeg", "-y", "-i", str(input_wav), "-c:a", "aac", "-b:a", "192k", str(output_file)]
 
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             print(f"Pomyślnie wygenerowano plik: {output_file}")
             # Optionally remove temporary WAV file
@@ -90,10 +94,7 @@ def convert_wav_to_mp3_or_aac(input_wav: Path, output_file: Path) -> bool:
 
 
 def postprocess_podcast_audio(
-    script: PodcastScript,
-    audio_map: dict[str, str],
-    output_dir: Path,
-    output_format: str = "mp3"
+    script: PodcastScript, audio_map: dict[str, str], output_dir: Path, output_format: str = "mp3"
 ) -> Path | None:
     """Merge all chunk audio files into a single file and convert to requested format (mp3/m4a/wav)."""
     # Order files according to the script chunks
@@ -110,9 +111,9 @@ def postprocess_podcast_audio(
     stem = Path(script.title or "podcast").stem
     # Replace spaces and special chars in filename
     safe_stem = "".join([c if c.isalnum() or c in ("-", "_") else "_" for c in stem])
-    
+
     temp_wav = output_dir / f"{safe_stem}_temp_merged.wav"
-    
+
     # First merge WAV files
     success = merge_wav_files(audio_files, temp_wav)
     if not success:
@@ -138,7 +139,7 @@ def postprocess_podcast_audio(
         if output_format == "aac":
             # ffmpeg aac works better inside m4a container for phone playback
             final_output = output_dir / f"{safe_stem}.m4a"
-            
+
         conv_success = convert_wav_to_mp3_or_aac(temp_wav, final_output)
         if conv_success:
             return final_output

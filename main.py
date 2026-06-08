@@ -31,13 +31,13 @@ import sys
 from pathlib import Path
 
 from preprocess.pdf_extractor import extract_and_parse
+from preprocess.proofreader import proofread_script
 from preprocess.tts_script_builder import (
     PodcastScript,
     build_podcast_script,
     save_script_json,
     save_script_text,
 )
-from preprocess.proofreader import proofread_script
 from tts import (
     GoogleTTSConfig,
     LocalTTSConfig,
@@ -106,6 +106,7 @@ def process_pdf(
 
         # Step 5: Merge and convert to final podcast audio file
         from tts.postprocessor import postprocess_podcast_audio
+
         merged_file = postprocess_podcast_audio(
             script=script,
             audio_map=audio_map,

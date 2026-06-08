@@ -187,7 +187,7 @@ def generate_podcast_audio(
 
     # Batch size: match the server's single-worker capacity.
     # Submit 2 jobs at a time, wait for both to complete, then next batch.
-    BATCH_SIZE = 2
+    batch_size = 2
 
     chunks = script.chunks
     total = len(chunks)
@@ -195,11 +195,11 @@ def generate_podcast_audio(
     failed_chunks: list[str] = []
     processed = 0
 
-    print(f"Processing {total} chunks in batches of {BATCH_SIZE}...")
+    print(f"Processing {total} chunks in batches of {batch_size}...")
 
     while processed < total:
         # Submit a batch
-        batch = chunks[processed: processed + BATCH_SIZE]
+        batch = chunks[processed : processed + batch_size]
         batch_chunk_to_job: dict[str, str] = {}  # chunk_id -> job_id (local to this batch)
 
         for chunk in batch:

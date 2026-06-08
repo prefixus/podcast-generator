@@ -1,11 +1,13 @@
 """Proofreader module using local LM Studio server."""
 
 from __future__ import annotations
-import re
+
 import requests
+
 from preprocess.tts_script_builder import PodcastScript
 
 DEFAULT_API_URL = "http://localhost:1234/v1/chat/completions"
+
 
 def get_available_models(api_url: str) -> list[str]:
     """Fetch the list of available model IDs from LM Studio."""
@@ -18,6 +20,7 @@ def get_available_models(api_url: str) -> list[str]:
     except Exception:
         return []
 
+
 def proofread_text(text: str, model: str, api_url: str) -> str:
     """Send text to local LLM to fix Polish spelling, grammar, and inflection."""
     prompt = (
@@ -29,15 +32,13 @@ def proofread_text(text: str, model: str, api_url: str) -> str:
         "komentarzy ani cudzysłowów.\n\n"
         f"Tekst do poprawy:\n{text}"
     )
-    
+
     payload = {
         "model": model,
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
+        "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.1,
     }
-    
+
     try:
         response = requests.post(api_url, json=payload, timeout=60)
         response.raise_for_status()
@@ -56,6 +57,7 @@ def proofread_text(text: str, model: str, api_url: str) -> str:
         print(f"  [Ostrzeżenie] Nie udało się poprawić tekstu przez LLM ({e}). Używam oryginalnego.")
         return text
 
+
 def proofread_script(
     script: PodcastScript,
     preferred_model: str = "google/gemma-4-26b-a4b-qat",
@@ -63,7 +65,7 @@ def proofread_script(
 ) -> None:
     """Proofread all chunks in the script in-place using LM Studio."""
     models = get_available_models(api_url)
-    
+
     # Try to find the preferred model, or fallback to first available, or fallback to preferred_model string
     model = preferred_model
     if models:
@@ -84,10 +86,10 @@ def proofread_script(
         text = chunk.text.strip()
         if not text:
             continue
-            
-        print(f"[{idx+1}/{total}] Korygowanie fragmentu: {chunk.id} ({len(text)} znaków)...")
+
+        print(f"[{idx + 1}/{total}] Korygowanie fragmentu: {chunk.id} ({len(text)} znaków)...")
         corrected = proofread_text(text, model, api_url)
         if corrected != text:
             chunk.text = corrected
-            print(f"  -> Tekst poprawiony.")
+            print("  -> Tekst poprawiony.")
     print("Korekta językowa zakończona.")

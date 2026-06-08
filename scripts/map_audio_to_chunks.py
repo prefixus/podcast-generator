@@ -34,6 +34,7 @@ def main():
             job_id = wav_file.stem
             # Get job text from server to match
             import requests
+
             try:
                 resp = requests.get(f"http://127.0.0.1:8000/jobs/{job_id}", timeout=10)
                 job = resp.json()
@@ -75,5 +76,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import requests
     main()

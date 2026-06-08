@@ -203,9 +203,11 @@ def _extract_sections_from_pages(reader: PdfReader) -> list[Section]:
             if current_section is not None and not current_section.body:
                 title_words = current_section.title.split()
                 last_word = title_words[-1].lower() if title_words else ""
-                ends_with_dash = (
-                    current_section.title.rstrip().endswith(("-", "–", "—", ","))
-                    or last_word in ("i", "lub", "a", "oraz")
+                ends_with_dash = current_section.title.rstrip().endswith(("-", "–", "—", ",")) or last_word in (
+                    "i",
+                    "lub",
+                    "a",
+                    "oraz",
                 )
                 starts_with_lower = bool(re.match(r"^[a-zęóąśłżńćż]", line))
                 is_article = bool(re.match(r"^(art\b|ust\b|par\b|\d+)", line, re.IGNORECASE))
